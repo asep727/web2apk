@@ -18,3 +18,85 @@ on:
         required: false
         default: "apk"
         type: string
+
+jobs:
+  build:
+    name: Kompilasi Utama
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Download project
+        shell: bash
+        run: |
+          set -e
+
+          if [ -z "${{ inputs.zip_url }}" ]; then
+            echo "::error::zip_url kosong"
+            exit 1
+          fi
+
+          curl -L \
+            --fail \
+            --retry 3 \
+            "${{ inputs.zip_url }}" \
+            -o project.zip
+
+          unzip -q project.zip -d extracted
+
+          PUBSPEC=$(find extracted -type f -name pubspec.yaml | head -n 1)
+
+          if [ -z "$PUBSPEC" ]; then
+            echo "::error::pubspec.yaml tidak ditemukan."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$PUBSPEC")
+          cp -a "$PROJECT_DIR" project
+
+      - name: Flutter dependencies
+        working-directory: project
+        run: |
+          flutter clean
+          flutter pub get
+
+      - name: Build APK
+        working-directory: project
+        run: |
+          flutter build apk --release
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          APK="project/build/app/outputs/flutter-apk/app-release.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "::error::app-release.apk tidak ditemukan."
+            exit 1
+          fi
+
+          mkdir -p output
+          cp "$APK" "output/${{ inputs.tag }}.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.tag }}
+          path: output/${{ inputs.tag }}.apk
+          if-no-files-found: error
+          retention-days: 7
