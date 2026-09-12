@@ -4,14 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       zip_url:
-        description: "URL ZIP project Flutter"
+        description: "URL ZIP project"
         required: true
         type: string
 
       tag:
-        description: "Nama/ID build"
+        description: "ID/Nama build"
         required: true
-        default: "web2apk"
+        type: string
+
+      build_type:
+        description: "Tipe build"
+        required: false
+        default: "apk"
         type: string
 
 jobs:
