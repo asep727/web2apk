@@ -1,5 +1,20 @@
-{
-  "tokens": [
-    "token"
-  ]
-}
+name: Build Web2APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_url:
+        description: "URL ZIP project"
+        required: true
+        type: string
+
+      tag:
+        description: "ID build"
+        required: true
+        type: string
+
+      build_type:
+        description: "Tipe build"
+        required: false
+        default: "apk"
+        type: string
