@@ -1,0 +1,130 @@
+name: Build Web2APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_url:
+        description: "URL ZIP project Flutter"
+        required: true
+        type: string
+
+      tag:
+        description: "Nama/ID build"
+        required: true
+        default: "web2apk"
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Download project ZIP
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_URL="${{ inputs.zip_url }}"
+
+          if [ -z "$ZIP_URL" ]; then
+            echo "::error::Input zip_url kosong."
+            exit 1
+          fi
+
+          curl -L \
+            --fail \
+            --retry 3 \
+            --retry-delay 3 \
+            "$ZIP_URL" \
+            -o project.zip
+
+          echo "ZIP berhasil didownload:"
+          ls -lh project.zip
+
+      - name: Extract project
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf extracted project
+          mkdir -p extracted
+
+          unzip -q project.zip -d extracted
+
+          PUBSPEC=$(find extracted -type f -name pubspec.yaml | head -n 1)
+
+          if [ -z "$PUBSPEC" ]; then
+            echo "::error::pubspec.yaml tidak ditemukan di ZIP."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$PUBSPEC")
+
+          echo "Project ditemukan di:"
+          echo "$PROJECT_DIR"
+
+          cp -a "$PROJECT_DIR" project
+
+      - name: Check Flutter
+        working-directory: project
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Get dependencies
+        working-directory: project
+        run: flutter pub get
+
+      - name: Clean project
+        working-directory: project
+        run: flutter clean
+
+      - name: Get dependencies again
+        working-directory: project
+        run: flutter pub get
+
+      - name: Build APK Release
+        working-directory: project
+        run: |
+          flutter build apk --release
+
+      - name: Check APK
+        shell: bash
+        run: |
+          APK="project/build/app/outputs/flutter-apk/app-release.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "::error::APK tidak ditemukan setelah proses build."
+            exit 1
+          fi
+
+          mkdir -p output
+
+          cp "$APK" "output/${{ inputs.tag }}.apk"
+
+          echo "APK berhasil dibuat:"
+          ls -lh output/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.tag }}
+          path: output/${{ inputs.tag }}.apk
+          if-no-files-found: error
+          retention-days: 7
