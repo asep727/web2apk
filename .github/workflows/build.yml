@@ -75,6 +75,16 @@ jobs:
           flutter clean
           flutter pub get
 
+      - name: Upgrade Gradle wrapper if needed
+        working-directory: project
+        shell: bash
+        run: |
+          F=android/gradle/wrapper/gradle-wrapper.properties
+          if [ -f "$F" ]; then
+            sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.14-all.zip#' "$F"
+            cat "$F"
+          fi
+
       - name: Build APK
         working-directory: project
         run: |
